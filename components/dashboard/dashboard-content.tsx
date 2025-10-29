@@ -18,16 +18,16 @@ interface DashboardContentProps {
 
 export function DashboardContent({ profile, stats, todayControls }: DashboardContentProps) {
   return (
-    <div className="flex-1 overflow-auto">
-      <div className="p-6 space-y-6">
+    <div className="flex-1 overflow-auto p-4 md:p-6">
+      <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold">Welcome back, {profile?.clinic_name}</h1>
-          <p className="text-muted-foreground">Here's what's happening at your clinic today</p>
+        <div className="md:hidden mb-6">
+          <h1 className="text-2xl font-bold">Welcome back!</h1>
+          <p className="text-muted-foreground text-sm">{profile?.clinic_name}</p>
         </div>
 
-        {/* Quick Stats */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* Mobile-friendly stats cards - single column on mobile */}
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Patients</CardTitle>
@@ -85,17 +85,18 @@ export function DashboardContent({ profile, stats, todayControls }: DashboardCon
           </Card>
         </div>
 
-        {/* Today's Schedule */}
+        {/* Today's Schedule - Mobile optimized */}
         <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Today's Schedule</CardTitle>
-              <Link href="/controls?filter=today">
-                <Button variant="outline" size="sm">
-                  View All
-                </Button>
-              </Link>
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Today's Schedule</CardTitle>
+            <Link href="/controls?filter=today">
+              <Button variant="outline" size="sm" className="hidden md:flex">
+                View All
+              </Button>
+              <Button variant="outline" size="sm" className="md:hidden">
+                All
+              </Button>
+            </Link>
           </CardHeader>
           <CardContent>
             {todayControls.length === 0 ? (
@@ -105,17 +106,17 @@ export function DashboardContent({ profile, stats, todayControls }: DashboardCon
                 {todayControls.slice(0, 5).map((control) => (
                   <div
                     key={control.id}
-                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50"
+                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 border rounded-lg hover:bg-muted/50 gap-2"
                   >
-                    <div className="flex-1">
-                      <p className="font-medium">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">
                         {control.patients.first_name} {control.patients.last_name}
                       </p>
-                      <p className="text-sm text-muted-foreground">{control.control_type}</p>
+                      <p className="text-sm text-muted-foreground truncate">{control.control_type}</p>
                     </div>
-                    <div className="text-right">
-                      <p className="font-medium">{new Date(control.scheduled_date).toLocaleTimeString()}</p>
-                      <Badge className="mt-1">{control.status}</Badge>
+                    <div className="text-right sm:text-right">
+                      <p className="font-medium">{new Date(control.scheduled_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                      <Badge className="mt-1 sm:mt-1">{control.status}</Badge>
                     </div>
                   </div>
                 ))}
@@ -124,31 +125,31 @@ export function DashboardContent({ profile, stats, todayControls }: DashboardCon
           </CardContent>
         </Card>
 
-        {/* Quick Actions */}
+        {/* Quick Actions - Mobile optimized */}
         <Card>
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
               <Link href="/patients/new">
                 <Button className="w-full bg-transparent" variant="outline">
-                  Add Patient
+                  <span className="truncate">Add Patient</span>
                 </Button>
               </Link>
               <Link href="/controls/new">
                 <Button className="w-full bg-transparent" variant="outline">
-                  Schedule Control
+                  <span className="truncate">Schedule Control</span>
                 </Button>
               </Link>
               <Link href="/schedules/new">
                 <Button className="w-full bg-transparent" variant="outline">
-                  Create Schedule
+                  <span className="truncate">Create Schedule</span>
                 </Button>
               </Link>
               <Link href="/reports">
                 <Button className="w-full bg-transparent" variant="outline">
-                  View Reports
+                  <span className="truncate">View Reports</span>
                 </Button>
               </Link>
             </div>

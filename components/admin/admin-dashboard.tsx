@@ -17,8 +17,8 @@ interface AdminDashboardProps {
 export function AdminDashboard({ stats, clinics }: AdminDashboardProps) {
   return (
     <div className="space-y-6">
-      {/* System Statistics */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* Mobile-friendly stats cards */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Clinics</CardTitle>
@@ -60,11 +60,11 @@ export function AdminDashboard({ stats, clinics }: AdminDashboardProps) {
         </Card>
       </div>
 
-      {/* Clinic Management */}
+      {/* Clinic Management with mobile-optimized tabs */}
       <Tabs defaultValue="clinics" className="w-full">
-        <TabsList>
-          <TabsTrigger value="clinics">Clinic Management</TabsTrigger>
-          <TabsTrigger value="analytics">System Analytics</TabsTrigger>
+        <TabsList className="w-full overflow-x-auto">
+          <TabsTrigger value="clinics" className="flex-1 min-w-[120px]">Clinic Management</TabsTrigger>
+          <TabsTrigger value="analytics" className="flex-1 min-w-[120px]">System Analytics</TabsTrigger>
         </TabsList>
 
         <TabsContent value="clinics">
@@ -74,29 +74,35 @@ export function AdminDashboard({ stats, clinics }: AdminDashboardProps) {
             </CardHeader>
             <CardContent>
               {clinics.length === 0 ? (
-                <p className="text-muted-foreground">No clinics registered yet</p>
+                <p className="text-muted-foreground text-center py-8">No clinics registered yet</p>
               ) : (
-                <div className="rounded-lg border overflow-hidden">
-                  <table className="w-full">
+                <div className="rounded-lg border overflow-x-auto">
+                  <table className="w-full min-w-[600px]">
                     <thead className="bg-muted">
                       <tr>
-                        <th className="px-6 py-3 text-left text-sm font-semibold">Clinic Name</th>
-                        <th className="px-6 py-3 text-left text-sm font-semibold">Admin Email</th>
-                        <th className="px-6 py-3 text-left text-sm font-semibold">Role</th>
-                        <th className="px-6 py-3 text-left text-sm font-semibold">Created</th>
-                        <th className="px-6 py-3 text-left text-sm font-semibold">Actions</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold">Clinic Name</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold">Admin Email</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold">Role</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold">Created</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {clinics.map((clinic) => (
                         <tr key={clinic.id} className="border-t hover:bg-muted/50">
-                          <td className="px-6 py-4 font-medium">{clinic.clinic_name || "Unnamed Clinic"}</td>
-                          <td className="px-6 py-4 text-sm">{clinic.email}</td>
-                          <td className="px-6 py-4">
+                          <td className="px-4 py-4 font-medium max-w-[150px] truncate" title={clinic.clinic_name || "Unnamed Clinic"}>
+                            {clinic.clinic_name || "Unnamed Clinic"}
+                          </td>
+                          <td className="px-4 py-4 text-sm max-w-[150px] truncate" title={clinic.email}>
+                            {clinic.email}
+                          </td>
+                          <td className="px-4 py-4">
                             <Badge className="capitalize">{clinic.role}</Badge>
                           </td>
-                          <td className="px-6 py-4 text-sm">{new Date(clinic.created_at).toLocaleDateString()}</td>
-                          <td className="px-6 py-4">
+                          <td className="px-4 py-4 text-sm">
+                            {new Date(clinic.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="px-4 py-4">
                             <Button variant="outline" size="sm">
                               View Details
                             </Button>
@@ -118,7 +124,7 @@ export function AdminDashboard({ stats, clinics }: AdminDashboardProps) {
                 <CardTitle>System Overview</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
                   <div className="p-4 border rounded-lg">
                     <p className="text-sm text-muted-foreground mb-1">Average Patients per Clinic</p>
                     <p className="text-2xl font-bold">
