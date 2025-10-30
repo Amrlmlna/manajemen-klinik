@@ -14,7 +14,6 @@ export type Database = {
       patients: {
         Row: {
           id: string
-          clinic_id: string
           first_name: string
           last_name: string
           email: string | null
@@ -28,7 +27,6 @@ export type Database = {
       controls: {
         Row: {
           id: string
-          clinic_id: string
           patient_id: string
           control_type: string
           scheduled_date: string
@@ -42,7 +40,6 @@ export type Database = {
       control_schedules: {
         Row: {
           id: string
-          clinic_id: string
           patient_id: string
           control_type: string
           frequency: string
@@ -57,7 +54,6 @@ export type Database = {
       costs: {
         Row: {
           id: string
-          clinic_id: string
           control_id: string | null
           amount: number
           cost_type: string
@@ -69,7 +65,6 @@ export type Database = {
       notifications: {
         Row: {
           id: string
-          clinic_id: string
           patient_id: string | null
           control_id: string | null
           notification_type: string

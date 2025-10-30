@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 
 export async function createNotification(
-  clinicId: string,
   type: "control_reminder" | "control_completed" | "schedule_created" | "schedule_updated",
   message: string,
   patientId?: string,
@@ -11,7 +10,6 @@ export async function createNotification(
 
   try {
     const { error } = await supabase.from("notifications").insert({
-      clinic_id: clinicId,
       patient_id: patientId || null,
       control_id: controlId || null,
       notification_type: type,

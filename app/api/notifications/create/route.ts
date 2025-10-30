@@ -4,12 +4,11 @@ import { NextResponse } from "next/server"
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { clinicId, type, message, patientId, controlId } = body
+    const { type, message, patientId, controlId } = body
 
     const supabase = await createClient()
 
     const { error } = await supabase.from("notifications").insert({
-      clinic_id: clinicId,
       patient_id: patientId || null,
       control_id: controlId || null,
       notification_type: type,
