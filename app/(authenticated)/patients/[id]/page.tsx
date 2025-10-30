@@ -27,9 +27,9 @@ export default async function PatientDetailPage({
   }
 
   return (
-    <div className="flex min-h-svh w-full flex-col">
-      <header className="border-b">
-        <div className="flex items-center gap-4 p-6">
+    <div className="flex-1 flex flex-col overflow-auto">
+      <div className="p-6">
+        <div className="mb-6 flex items-center gap-4">
           <Link href="/patients">
             <Button variant="outline">Back</Button>
           </Link>
@@ -37,10 +37,8 @@ export default async function PatientDetailPage({
             {patient.first_name} {patient.last_name}
           </h1>
         </div>
-      </header>
-      <main className="flex-1 p-6">
         <PatientDetail patient={patient} />
-      </main>
+      </div>
     </div>
   )
 }

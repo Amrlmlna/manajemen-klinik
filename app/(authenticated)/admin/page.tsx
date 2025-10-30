@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { PersonalAdminDashboard } from "@/components/admin/personal-admin-dashboard"
+import { AdminDashboard } from "@/components/admin/admin-dashboard"
 
 export default async function AdminPage() {
   const supabase = await createClient()
@@ -38,26 +38,24 @@ export default async function AdminPage() {
     }, 0) || 0
 
   return (
-    <div className="flex min-h-svh w-full flex-col">
-      <header className="border-b">
-        <div className="flex items-center justify-between p-6">
+    <div className="flex-1 flex flex-col overflow-auto">
+      <div className="p-6">
+        <div className="mb-6 flex items-center justify-between">
           <h1 className="text-2xl font-bold">Clinic Administration</h1>
           <Link href="/dashboard">
             <Button variant="outline">Back to Dashboard</Button>
           </Link>
         </div>
-      </header>
-      <main className="flex-1 p-6">
-        <PersonalAdminDashboard
+        <AdminDashboard
           stats={{
             totalClinics: 1, // Personal clinic only
             totalPatients: allPatients?.length || 0,
             totalControls: allControls?.length || 0,
             totalRevenue: totalRevenue,
           }}
-          users={clinicUsers || []}
+          clinics={clinicUsers || []}
         />
-      </main>
+      </div>
     </div>
   )
 }

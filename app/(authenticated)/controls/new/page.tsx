@@ -25,24 +25,21 @@ export default async function NewControlPage({
   const { data: patients } = await supabase
     .from("patients")
     .select("id, first_name, last_name")
-    .eq("clinic_id", user.id)
     .order("first_name")
 
   return (
-    <div className="flex min-h-svh w-full flex-col">
-      <header className="border-b">
-        <div className="flex items-center gap-4 p-6">
+    <div className="flex-1 flex flex-col overflow-auto">
+      <div className="p-6">
+        <div className="mb-6 flex items-center gap-4">
           <Link href="/controls">
             <Button variant="outline">Back</Button>
           </Link>
           <h1 className="text-2xl font-bold">Schedule New Control</h1>
         </div>
-      </header>
-      <main className="flex-1 p-6">
         <div className="max-w-2xl">
           <ControlForm patients={patients || []} defaultPatientId={patientId} />
         </div>
-      </main>
+      </div>
     </div>
   )
 }

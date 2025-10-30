@@ -49,9 +49,9 @@ export default async function ControlsPage({
   const { data: controls } = await query.order("scheduled_date", { ascending: true })
 
   return (
-    <div className="flex min-h-svh w-full flex-col">
-      <header className="border-b">
-        <div className="flex items-center justify-between p-6">
+    <div className="flex-1 flex flex-col overflow-auto">
+      <div className="p-6">
+        <div className="mb-6 flex items-center justify-between">
           <h1 className="text-2xl font-bold">Medical Controls</h1>
           <div className="flex gap-2">
             <Link href="/controls/new">
@@ -62,10 +62,8 @@ export default async function ControlsPage({
             </Link>
           </div>
         </div>
-      </header>
-      <main className="flex-1 p-6">
         <ControlsList controls={controls || []} />
-      </main>
+      </div>
     </div>
   )
 }

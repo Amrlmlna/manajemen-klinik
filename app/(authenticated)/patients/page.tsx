@@ -21,18 +21,16 @@ export default async function PatientsPage() {
     .order("created_at", { ascending: false })
 
   return (
-    <div className="flex min-h-svh w-full flex-col">
-      <header className="border-b">
-        <div className="flex items-center justify-between p-6">
+    <div className="flex-1 flex flex-col overflow-auto">
+      <div className="p-6">
+        <div className="mb-6 flex items-center justify-between">
           <h1 className="text-2xl font-bold">Patients</h1>
           <Link href="/patients/new">
             <Button>Add Patient</Button>
           </Link>
         </div>
-      </header>
-      <main className="flex-1 p-6">
         <PatientsList patients={patients || []} />
-      </main>
+      </div>
     </div>
   )
 }
