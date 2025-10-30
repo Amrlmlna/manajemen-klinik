@@ -22,10 +22,10 @@ export default async function ReportsPage({
   const month = params.month ? Number.parseInt(params.month) : now.getMonth() + 1
   const year = params.year ? Number.parseInt(params.year) : now.getFullYear()
 
-  // Get all costs for the clinic
-  const { data: allCosts } = await supabase.from("costs").select("*").eq("clinic_id", user.id)
+  // Get all costs 
+  const { data: allCosts } = await supabase.from("costs").select("*")
 
-  // Get all controls for the clinic
+  // Get all controls 
   const { data: allControls } = await supabase
     .from("controls")
     .select(
@@ -37,7 +37,6 @@ export default async function ReportsPage({
       )
     `,
     )
-    .eq("clinic_id", user.id)
 
   // Calculate monthly revenue
   const monthlyRevenue =

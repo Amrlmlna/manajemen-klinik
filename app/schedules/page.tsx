@@ -26,7 +26,6 @@ export default async function SchedulesPage() {
       )
     `,
     )
-    .eq("clinic_id", user.id)
     .order("created_at", { ascending: false })
 
   return (

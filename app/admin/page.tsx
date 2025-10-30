@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { AdminDashboard } from "@/components/admin/admin-dashboard"
+import { PersonalAdminDashboard } from "@/components/admin/personal-admin-dashboard"
 
 export default async function AdminPage() {
   const supabase = await createClient()
@@ -22,8 +22,8 @@ export default async function AdminPage() {
     redirect("/dashboard")
   }
 
-  // Get system-wide statistics
-  const { data: allProfiles } = await supabase.from("profiles").select("*")
+  // Get clinic statistics (for personal clinic)
+  const { data: clinicUsers } = await supabase.from("profiles").select("*")
 
   const { data: allPatients } = await supabase.from("patients").select("*")
 
@@ -41,21 +41,21 @@ export default async function AdminPage() {
     <div className="flex min-h-svh w-full flex-col">
       <header className="border-b">
         <div className="flex items-center justify-between p-6">
-          <h1 className="text-2xl font-bold">System Administration</h1>
+          <h1 className="text-2xl font-bold">Clinic Administration</h1>
           <Link href="/dashboard">
             <Button variant="outline">Back to Dashboard</Button>
           </Link>
         </div>
       </header>
       <main className="flex-1 p-6">
-        <AdminDashboard
+        <PersonalAdminDashboard
           stats={{
-            totalClinics: allProfiles?.length || 0,
+            totalClinics: 1, // Personal clinic only
             totalPatients: allPatients?.length || 0,
             totalControls: allControls?.length || 0,
             totalRevenue: totalRevenue,
           }}
-          clinics={allProfiles || []}
+          users={clinicUsers || []}
         />
       </main>
     </div>

@@ -28,7 +28,6 @@ export default async function NotificationsPage() {
       )
     `,
     )
-    .eq("clinic_id", user.id)
     .order("created_at", { ascending: false })
 
   return (

@@ -34,7 +34,6 @@ export default async function ControlsPage({
       )
     `,
     )
-    .eq("clinic_id", user.id)
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)

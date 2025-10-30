@@ -15,8 +15,8 @@ export default async function DashboardPage() {
 
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
-  // Get clinic-specific statistics
-  const { data: patients } = await supabase.from("patients").select("*").eq("clinic_id", user.id)
+  // Get all statistics (for personal clinic)
+  const { data: patients } = await supabase.from("patients").select("*")
 
   const { data: controls } = await supabase
     .from("controls")
@@ -29,7 +29,6 @@ export default async function DashboardPage() {
       )
     `,
     )
-    .eq("clinic_id", user.id)
     .gte("scheduled_date", new Date().toISOString())
     .order("scheduled_date", { ascending: true })
 
@@ -49,12 +48,11 @@ export default async function DashboardPage() {
       )
     `,
     )
-    .eq("clinic_id", user.id)
     .gte("scheduled_date", today.toISOString())
     .lt("scheduled_date", tomorrow.toISOString())
     .order("scheduled_date", { ascending: true })
 
-  const { data: costs } = await supabase.from("costs").select("*").eq("clinic_id", user.id)
+  const { data: costs } = await supabase.from("costs").select("*")
 
   const thisMonthRevenue =
     costs

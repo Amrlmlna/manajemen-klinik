@@ -20,7 +20,7 @@ export default async function PatientDetailPage({
   }
 
   const { id } = await params
-  const { data: patient } = await supabase.from("patients").select("*").eq("id", id).eq("clinic_id", user.id).single()
+  const { data: patient } = await supabase.from("patients").select("*").eq("id", id).single()
 
   if (!patient) {
     redirect("/patients")
