@@ -38,9 +38,6 @@ export function Navbar() {
               Login
             </Button>
           </Link>
-          <Link href="/auth/sign-up">
-            <Button size="sm">Sign Up</Button>
-          </Link>
         </div>
 
         {/* Mobile Menu Button */}
@@ -62,6 +59,9 @@ export function Navbar() {
           </Link>
           <Link href="#pricing" className="block text-sm text-muted-foreground hover:text-foreground">
             Pricing
+          </Link>
+          <Link href="/auth/login" className="block text-sm text-muted-foreground hover:text-foreground">
+            Login
           </Link>
         </div>
       )}

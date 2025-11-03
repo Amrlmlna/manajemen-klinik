@@ -17,7 +17,12 @@ export function NotificationBell({ userId }: NotificationBellProps) {
 
     // Get initial unread count
     const fetchUnreadCount = async () => {
-      const { data } = await supabase.from("notifications").select("id").eq("clinic_id", userId).eq("is_read", false)
+      // For now, get all notifications (in a real implementation, 
+      // this would be filtered by user's clinic or related entities)
+      const { data } = await supabase
+        .from("notifications")
+        .select("id")
+        .eq("is_read", false)
 
       setUnreadCount(data?.length || 0)
     }
@@ -33,7 +38,6 @@ export function NotificationBell({ userId }: NotificationBellProps) {
           event: "*",
           schema: "public",
           table: "notifications",
-          filter: `clinic_id=eq.${userId}`,
         },
         () => {
           fetchUnreadCount()
