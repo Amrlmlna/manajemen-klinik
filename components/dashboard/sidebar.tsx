@@ -45,9 +45,11 @@ export function Sidebar({ userId, clinicName, role }: SidebarProps) {
   const getMenuLinks = () => {
     const baseLinks = [
       { href: "/dashboard", label: "Dashboard", icon: Home },
+      { href: "/simple-dashboard", label: "Simple View", icon: Calendar }, // Mobile-friendly simplified view
       { href: "/patients", label: "Patients", icon: Users },
       { href: "/controls", label: "Controls", icon: Calendar },
       { href: "/schedules", label: "Schedules", icon: Calendar },
+      { href: "/calendar", label: "Calendar", icon: Calendar }, // Added calendar link
       { href: "/reports", label: "Reports", icon: BarChart },
       { href: "/settings", label: "Settings", icon: Settings },
     ];

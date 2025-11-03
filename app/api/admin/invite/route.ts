@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
 
 interface InviteRequestBody {
   email: string
@@ -56,38 +55,42 @@ export async function POST(request: Request) {
       )
     }
 
-    // Create a temporary record for the invited user
-    // In a real implementation, you might want to use Supabase Auth's magic link
-    // or have a separate invites table
-    
-    // For now, let's directly create the user profile if they don't exist
-    // but we'll need to use Supabase Auth's sign-up method with a temporary password
-    // or send them an invitation email
-    
-    // This is typically done through Supabase's built-in user management
-    // For a production system, you would implement an email invitation system
-    // Here's a simplified approach:
-    
-    const { data: existingUser, error: existingUserError } = await supabase
+    // Check if user already exists in the system
+    const { data: existingProfile } = await supabase
       .from("profiles")
       .select("id")
       .eq("email", email)
       .single()
 
-    if (existingUser) {
+    if (existingProfile) {
       return NextResponse.json(
         { error: "User with this email already exists" },
         { status: 400 }
       )
     }
 
-    // In a real implementation, you would send an invitation email
-    // For now, we'll just return success
-    console.log(`User invitation sent to ${email} with role ${role}`)
-    
+    // Use Supabase's magic link feature to invite the user
+    // This will send an email to the user with a secure login link
+    const { error: authError } = await supabase.auth.signInWithOtp({
+      email: email,
+      options: {
+        // Include the role in the URL params for the client to handle after sign in
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/invite-complete?role=${role}`,
+        shouldCreateUser: true, // This will create a new user if one doesn't exist
+      }
+    })
+
+    if (authError) {
+      console.error("Error sending magic link:", authError)
+      return NextResponse.json(
+        { error: "Failed to send invitation email" },
+        { status: 500 }
+      )
+    }
+
     return NextResponse.json({ 
       success: true, 
-      message: `Invitation sent to ${email}` 
+      message: `Invitation sent to ${email}. They will receive an email to set up their account.` 
     })
   } catch (error) {
     console.error("Error inviting user:", error)
