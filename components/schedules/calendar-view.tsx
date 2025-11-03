@@ -51,6 +51,9 @@ const CustomEvent = ({ event }: any) => {
       <div className="text-xs flex items-center mt-1">
         <Clock className="h-3 w-3 mr-1" />
         {moment(event.start).format("HH:mm")}
+        {event.cost && (
+          <span className="ml-2 font-semibold">Rp{event.cost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+        )}
       </div>
       <div className="text-xs flex items-center">
         <Badge variant="secondary" className="text-[10px]">

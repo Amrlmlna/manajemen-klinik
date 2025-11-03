@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -130,7 +130,7 @@ const CalendarWrapper = ({ calendarEvents }: { calendarEvents: CalendarEvent[] }
       return (
         <div className={`p-1 rounded border text-xs ${getStatusColor(event.status)}`}>
           <div className="font-medium truncate">{event.title}</div>
-          <div className="truncate">{event.cost ? `$${event.cost}` : ''}</div>
+          <div className="truncate">{event.cost ? `Rp${event.cost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}</div>
         </div>
       );
     };
@@ -200,10 +200,14 @@ const CalendarWrapper = ({ calendarEvents }: { calendarEvents: CalendarEvent[] }
   return <CalendarComponent events={calendarEvents} />;
 };
 
-export function SimpleDashboard({ controls, schedules, patients, profile }: SimpleDashboardProps) {
+export function SimpleDashboard({ controls: initialControls, schedules: initialSchedules, patients, profile }: SimpleDashboardProps) {
+  const [controls, setControls] = useState(initialControls);
+  const [schedules, setSchedules] = useState(initialSchedules);
   const [showAddForm, setShowAddForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [viewMode, setViewMode] = useState<'table' | 'calendar' | 'patients'>('patients'); // New state for view mode (default to patients view)
+  const [viewMode, setViewMode] = useState<'table' | 'calendar' | 'patients'>('table'); // New state for view mode (default to table view)
+  const [addDropdownOpen, setAddDropdownOpen] = useState(false); // State for the add dropdown
+  const addDropdownRef = useRef<HTMLDivElement>(null);
   const [newControl, setNewControl] = useState({
     patient_id: "",
     control_type: "Checkup",
@@ -229,6 +233,12 @@ export function SimpleDashboard({ controls, schedules, patients, profile }: Simp
     cost: 0,
     notes: ""
   });
+  // State for editing existing controls
+  const [editingControl, setEditingControl] = useState<any>(null);
+  const [editingSchedule, setEditingSchedule] = useState<any>(null);
+  const [showEditControlForm, setShowEditControlForm] = useState(false);
+  const [showEditScheduleForm, setShowEditScheduleForm] = useState(false);
+  
   // New patient data for schedule form
   const [newPatientForSchedule, setNewPatientForSchedule] = useState({
     first_name: "",
@@ -240,6 +250,15 @@ export function SimpleDashboard({ controls, schedules, patients, profile }: Simp
   const [showAddScheduleForm, setShowAddScheduleForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Update local state when props change (in case parent re-renders with new data)
+  useEffect(() => {
+    setControls(initialControls);
+  }, [initialControls]);
+
+  useEffect(() => {
+    setSchedules(initialSchedules);
+  }, [initialSchedules]);
 
   // Transform controls data to calendar events format
   const calendarEvents: CalendarEvent[] = [
@@ -294,6 +313,156 @@ export function SimpleDashboard({ controls, schedules, patients, profile }: Simp
     if (error) throw error;
     
     return data;
+  };
+
+  // Function to update an existing control
+  const updateControl = async (controlId: string, updatedData: any) => {
+    const supabase = createClient();
+    
+    const { data, error } = await supabase
+      .from('controls')
+      .update(updatedData)
+      .eq('id', controlId)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return data;
+  };
+
+  // Function to update an existing schedule
+  const updateSchedule = async (scheduleId: string, updatedData: any) => {
+    const supabase = createClient();
+    
+    const { data, error } = await supabase
+      .from('control_schedules')
+      .update(updatedData)
+      .eq('id', scheduleId)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return data;
+  };
+
+  // Handle editing a control
+  const handleEditControl = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Store current control data to avoid race conditions
+    const currentControl = editingControl;
+    if (!currentControl || !currentControl.id) {
+      setError("Control data is not available for editing.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const supabase = createClient();
+
+      // Update the control
+      const { data: updatedControl, error: updateError } = await updateControl(currentControl.id, {
+        patient_id: currentControl.patient_id,
+        control_type: currentControl.control_type,
+        scheduled_date: currentControl.scheduled_date,
+        status: currentControl.status,
+        cost: currentControl.cost,
+        notes: currentControl.notes,
+      });
+
+      if (updateError) throw updateError;
+
+      // Update the associated cost record if it exists
+      if (updatedControl && updatedControl.cost && updatedControl.cost > 0) {
+        const { error: costError } = await supabase
+          .from('costs')
+          .upsert({
+            control_id: updatedControl.id,
+            amount: updatedControl.cost,
+            cost_type: 'control',
+            description: `Control fee for ${updatedControl.control_type}`,
+            cost_date: updatedControl.scheduled_date
+          });
+
+        if (costError) throw costError;
+      }
+
+      // Update the control in the local state (without reloading)
+      if (updatedControl) {
+        setControls(prevControls => 
+          prevControls.map(control => 
+            control.id === updatedControl.id ? updatedControl : control
+          )
+        );
+      }
+
+      // Reset form
+      setEditingControl(null);
+      setShowEditControlForm(false);
+      
+      // Show success feedback (optional)
+      // You could implement a toast notification here
+    } catch (err: any) {
+      console.error("Error updating control:", err);
+      setError(err.message || "Failed to update control. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle editing a schedule
+  const handleEditSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Store current schedule data to avoid race conditions
+    const currentSchedule = editingSchedule;
+    if (!currentSchedule || !currentSchedule.id) {
+      setError("Schedule data is not available for editing.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Update the schedule
+      const { data: updatedSchedule, error: updateError } = await updateSchedule(currentSchedule.id, {
+        patient_id: currentSchedule.patient_id,
+        control_type: currentSchedule.control_type,
+        frequency: currentSchedule.frequency,
+        start_date: currentSchedule.start_date,
+        end_date: currentSchedule.end_date || null,
+        cost: currentSchedule.cost,
+        is_active: currentSchedule.is_active,
+      });
+
+      if (updateError) throw updateError;
+
+      // Update the schedule in the local state (without reloading)
+      if (updatedSchedule) {
+        setSchedules(prevSchedules => 
+          prevSchedules.map(schedule => 
+            schedule.id === updatedSchedule.id ? updatedSchedule : schedule
+          )
+        );
+      }
+
+      // Reset form
+      setEditingSchedule(null);
+      setShowEditScheduleForm(false);
+      
+      // Show success feedback (optional)
+      // You could implement a toast notification here
+    } catch (err: any) {
+      console.error("Error updating schedule:", err);
+      setError(err.message || "Failed to update schedule. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAddControl = async (e: React.FormEvent) => {
@@ -376,9 +545,10 @@ export function SimpleDashboard({ controls, schedules, patients, profile }: Simp
       setCreateNewPatientForControl(false);
       setShowAddForm(false);
       
-      // In a real app, you would refresh the data or add to local state
-      // For now, we'll just reload the page
-      window.location.reload();
+      // Add the new control to the local state (without reloading)
+      if (controlData) {
+        setControls(prevControls => [...prevControls, controlData]);
+      }
     } catch (err: any) {
       console.error("Error adding control:", err);
       setError(err.message || "Failed to add control. Please try again.");
@@ -452,9 +622,10 @@ export function SimpleDashboard({ controls, schedules, patients, profile }: Simp
       setCreateNewPatientForSchedule(false);
       setShowAddScheduleForm(false);
       
-      // In a real app, you would refresh the data or add to local state
-      // For now, we'll just reload the page
-      window.location.reload();
+      // Add the new schedule to the local state (without reloading)
+      if (scheduleData) {
+        setSchedules(prevSchedules => [...prevSchedules, scheduleData]);
+      }
     } catch (err: any) {
       console.error("Error adding schedule:", err);
       setError(err.message || "Failed to add schedule. Please try again.");
@@ -508,6 +679,23 @@ export function SimpleDashboard({ controls, schedules, patients, profile }: Simp
     return patientName.includes(searchTerm.toLowerCase());
   });
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (addDropdownRef.current && !addDropdownRef.current.contains(event.target as Node)) {
+        setAddDropdownOpen(false);
+      }
+    };
+
+    if (addDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [addDropdownOpen]);
+
   return (
     <div className="space-y-6">
       {/* Search and Add Section */}
@@ -544,53 +732,67 @@ export function SimpleDashboard({ controls, schedules, patients, profile }: Simp
             <User className="h-4 w-4" />
             Members
           </Button>
-          <div className="relative group">
-            <Button type="button">
+          <div className="relative" ref={addDropdownRef}>
+            <Button 
+              type="button"
+              onClick={() => setAddDropdownOpen(!addDropdownOpen)}
+              aria-expanded={addDropdownOpen}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Add
             </Button>
-            <div className="absolute right-0 mt-1 w-48 bg-white border rounded-md shadow-lg z-10 hidden group-hover:block">
-              <button
-                className="block w-full text-left px-4 py-2 hover:bg-gray-100"
-                onClick={() => {
-                  setShowAddForm(true);
-                  setShowAddScheduleForm(false);
-                  setCreateNewPatientForControl(false); // Default to existing patient
-                }}
-              >
-                Add Control (Existing Patient)
-              </button>
-              <button
-                className="block w-full text-left px-4 py-2 hover:bg-gray-100"
-                onClick={() => {
-                  setShowAddForm(true);
-                  setShowAddScheduleForm(false);
-                  setCreateNewPatientForControl(true); // Default to new patient
-                }}
-              >
-                Add Control (New Patient)
-              </button>
-              <button
-                className="block w-full text-left px-4 py-2 hover:bg-gray-100"
-                onClick={() => {
-                  setShowAddScheduleForm(true);
-                  setShowAddForm(false);
-                  setCreateNewPatientForSchedule(false); // Default to existing patient
-                }}
-              >
-                Add Schedule (Existing Patient)
-              </button>
-              <button
-                className="block w-full text-left px-4 py-2 hover:bg-gray-100"
-                onClick={() => {
-                  setShowAddScheduleForm(true);
-                  setShowAddForm(false);
-                  setCreateNewPatientForSchedule(true); // Default to new patient
-                }}
-              >
-                Add Schedule (New Patient)
-              </button>
-            </div>
+            {addDropdownOpen && (
+              <div className="absolute right-0 mt-1 w-48 bg-white border rounded-md shadow-lg z-10">
+                <button
+                  className="block w-full text-left px-4 py-2 hover:bg-gray-100"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setShowAddForm(true);
+                    setShowAddScheduleForm(false);
+                    setCreateNewPatientForControl(false); // Default to existing patient
+                    setAddDropdownOpen(false); // Close dropdown
+                  }}
+                >
+                  Add Control (Existing Patient)
+                </button>
+                <button
+                  className="block w-full text-left px-4 py-2 hover:bg-gray-100"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setShowAddForm(true);
+                    setShowAddScheduleForm(false);
+                    setCreateNewPatientForControl(true); // Default to new patient
+                    setAddDropdownOpen(false); // Close dropdown
+                  }}
+                >
+                  Add Control (New Patient)
+                </button>
+                <button
+                  className="block w-full text-left px-4 py-2 hover:bg-gray-100"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setShowAddScheduleForm(true);
+                    setShowAddForm(false);
+                    setCreateNewPatientForSchedule(false); // Default to existing patient
+                    setAddDropdownOpen(false); // Close dropdown
+                  }}
+                >
+                  Add Schedule (Existing Patient)
+                </button>
+                <button
+                  className="block w-full text-left px-4 py-2 hover:bg-gray-100"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setShowAddScheduleForm(true);
+                    setShowAddForm(false);
+                    setCreateNewPatientForSchedule(true); // Default to new patient
+                    setAddDropdownOpen(false); // Close dropdown
+                  }}
+                >
+                  Add Schedule (New Patient)
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -721,7 +923,7 @@ export function SimpleDashboard({ controls, schedules, patients, profile }: Simp
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="cost">Cost ($)</Label>
+                    <Label htmlFor="cost">Cost (Rp)</Label>
                     <Input
                       type="number"
                       placeholder="0.00"
@@ -902,7 +1104,7 @@ export function SimpleDashboard({ controls, schedules, patients, profile }: Simp
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="cost">Cost ($)</Label>
+                    <Label htmlFor="cost">Cost (Rp)</Label>
                     <Input
                       type="number"
                       placeholder="0.00"
@@ -958,6 +1160,263 @@ export function SimpleDashboard({ controls, schedules, patients, profile }: Simp
         )}
       </div>
 
+      {/* Edit Control Form */}
+      {showEditControlForm && editingControl && (
+        <Card className="mt-4">
+          <CardHeader>
+            <CardTitle>Edit Control</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {error && <div className="text-red-500 text-sm mb-4">{error}</div>}
+            
+            <form onSubmit={handleEditControl} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-patient">Patient</Label>
+                  <Select 
+                    value={editingControl.patient_id} 
+                    onValueChange={(value) => setEditingControl({...editingControl, patient_id: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {patients.map(patient => (
+                        <SelectItem key={patient.id} value={patient.id}>
+                          {patient.first_name} {patient.last_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-control-type">Control Type</Label>
+                  <Select 
+                    value={editingControl.control_type} 
+                    onValueChange={(value) => setEditingControl({...editingControl, control_type: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Checkup">Checkup</SelectItem>
+                      <SelectItem value="Follow-up">Follow-up</SelectItem>
+                      <SelectItem value="Treatment">Treatment</SelectItem>
+                      <SelectItem value="Review">Review</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-scheduled-date">Control Date</Label>
+                  <Input
+                    type="date"
+                    id="edit-scheduled-date"
+                    value={editingControl.scheduled_date.split('T')[0]}
+                    onChange={(e) => setEditingControl({...editingControl, scheduled_date: e.target.value})}
+                    required
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-status">Status</Label>
+                  <Select 
+                    value={editingControl.status} 
+                    onValueChange={(value) => setEditingControl({...editingControl, status: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="scheduled">Scheduled</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                      <SelectItem value="no_show">No Show</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-cost">Cost (Rp)</Label>
+                  <Input
+                    type="number"
+                    placeholder="0.00"
+                    value={editingControl.cost || 0}
+                    onChange={(e) => setEditingControl({...editingControl, cost: parseFloat(e.target.value) || 0})}
+                    min="0"
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="edit-notes">Notes</Label>
+                <Input
+                  placeholder="Additional notes..."
+                  value={editingControl.notes || ""}
+                  onChange={(e) => setEditingControl({...editingControl, notes: e.target.value})}
+                />
+              </div>
+              
+              <div className="flex gap-2 pt-2">
+                <Button 
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1"
+                >
+                  {loading ? "Updating..." : "Update Control"}
+                </Button>
+                <Button 
+                  type="button"
+                  variant="outline" 
+                  onClick={() => {
+                    setShowEditControlForm(false);
+                    setEditingControl(null);
+                  }}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Edit Schedule Form */}
+      {showEditScheduleForm && editingSchedule && (
+        <Card className="mt-4">
+          <CardHeader>
+            <CardTitle>Edit Schedule</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {error && <div className="text-red-500 text-sm mb-4">{error}</div>}
+            
+            <form onSubmit={handleEditSchedule} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-schedule-type">Control Type</Label>
+                  <Select 
+                    value={editingSchedule.control_type} 
+                    onValueChange={(value) => setEditingSchedule({...editingSchedule, control_type: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Checkup">Checkup</SelectItem>
+                      <SelectItem value="Follow-up">Follow-up</SelectItem>
+                      <SelectItem value="Treatment">Treatment</SelectItem>
+                      <SelectItem value="Review">Review</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-frequency">Frequency</Label>
+                  <Select 
+                    value={editingSchedule.frequency} 
+                    onValueChange={(value) => setEditingSchedule({...editingSchedule, frequency: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">Daily</SelectItem>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="quarterly">Quarterly</SelectItem>
+                      <SelectItem value="yearly">Yearly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-start-date">Start Date</Label>
+                  <Input
+                    type="date"
+                    id="edit-start-date"
+                    value={editingSchedule.start_date.split('T')[0]}
+                    onChange={(e) => setEditingSchedule({...editingSchedule, start_date: e.target.value})}
+                    required
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-end-date">End Date (optional)</Label>
+                  <Input
+                    type="date"
+                    id="edit-end-date"
+                    value={editingSchedule.end_date || ""}
+                    onChange={(e) => setEditingSchedule({...editingSchedule, end_date: e.target.value})}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-schedule-cost">Cost (Rp)</Label>
+                  <Input
+                    type="number"
+                    placeholder="0.00"
+                    value={editingSchedule.cost || 0}
+                    onChange={(e) => setEditingSchedule({...editingSchedule, cost: parseFloat(e.target.value) || 0})}
+                    min="0"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <div className="flex border rounded-md">
+                    <button
+                      type="button"
+                      className={`flex-1 py-2 text-sm rounded-l-md ${
+                        editingSchedule.is_active 
+                          ? "bg-primary text-primary-foreground" 
+                          : "bg-muted hover:bg-muted/80"
+                      }`}
+                      onClick={() => setEditingSchedule({...editingSchedule, is_active: true})}
+                    >
+                      Active
+                    </button>
+                    <button
+                      type="button"
+                      className={`flex-1 py-2 text-sm rounded-r-md ${
+                        !editingSchedule.is_active 
+                          ? "bg-primary text-primary-foreground" 
+                          : "bg-muted hover:bg-muted/80"
+                      }`}
+                      onClick={() => setEditingSchedule({...editingSchedule, is_active: false})}
+                    >
+                      Inactive
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex gap-2 pt-2">
+                <Button 
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1"
+                >
+                  {loading ? "Updating..." : "Update Schedule"}
+                </Button>
+                <Button 
+                  type="button"
+                  variant="outline" 
+                  onClick={() => {
+                    setShowEditScheduleForm(false);
+                    setEditingSchedule(null);
+                  }}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Toggleable View - Table, Calendar, or Patients */}
       {viewMode === 'table' ? (
         <Card>
@@ -982,6 +1441,7 @@ export function SimpleDashboard({ controls, schedules, patients, profile }: Simp
                       <th className="text-left py-2 text-sm font-medium text-muted-foreground">Date</th>
                       <th className="text-left py-2 text-sm font-medium text-muted-foreground">Cost</th>
                       <th className="text-left py-2 text-sm font-medium text-muted-foreground">Status</th>
+                      <th className="text-left py-2 text-sm font-medium text-muted-foreground">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1020,13 +1480,26 @@ export function SimpleDashboard({ controls, schedules, patients, profile }: Simp
                         <td className="py-3">
                           <div className="flex items-center gap-1">
                             <DollarSign className="h-4 w-4 text-muted-foreground" />
-                            <span>${(control.cost || 0).toFixed(2)}</span>
+                            <span>Rp{(control.cost || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                           </div>
                         </td>
                         <td className="py-3">
                           <Badge className={getStatusColor(control.status)}>
                             {control.status}
                           </Badge>
+                        </td>
+                        <td className="py-3">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent event bubbling
+                              setEditingControl({...control});
+                              setShowEditControlForm(true);
+                            }}
+                          >
+                            Edit
+                          </Button>
                         </td>
                       </tr>
                     ))}
@@ -1099,9 +1572,22 @@ export function SimpleDashboard({ controls, schedules, patients, profile }: Simp
                                           {new Date(control.scheduled_date).toLocaleDateString()}
                                         </div>
                                       </div>
-                                      <Badge className={getStatusColor(control.status)}>
-                                        {control.status}
-                                      </Badge>
+                                      <div className="flex items-center gap-2">
+                                        <Badge className={getStatusColor(control.status)}>
+                                          {control.status}
+                                        </Badge>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="sm"
+                                          onClick={(e) => {
+                                            e.stopPropagation(); // Prevent event bubbling
+                                            setEditingControl({...control});
+                                            setShowEditControlForm(true);
+                                          }}
+                                        >
+                                          Edit
+                                        </Button>
+                                      </div>
                                     </div>
                                   ))}
                                   {upcomingControls.length > 3 && (
@@ -1130,9 +1616,22 @@ export function SimpleDashboard({ controls, schedules, patients, profile }: Simp
                                           {schedule.frequency}
                                         </div>
                                       </div>
-                                      <Badge className={schedule.is_active ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>
-                                        {schedule.is_active ? "Active" : "Inactive"}
-                                      </Badge>
+                                      <div className="flex items-center gap-2">
+                                        <Badge className={schedule.is_active ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>
+                                          {schedule.is_active ? "Active" : "Inactive"}
+                                        </Badge>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="sm"
+                                          onClick={(e) => {
+                                            e.stopPropagation(); // Prevent event bubbling
+                                            setEditingSchedule({...schedule});
+                                            setShowEditScheduleForm(true);
+                                          }}
+                                        >
+                                          Edit
+                                        </Button>
+                                      </div>
                                     </div>
                                   ))}
                                 </div>
@@ -1156,9 +1655,22 @@ export function SimpleDashboard({ controls, schedules, patients, profile }: Simp
                                           {new Date(control.scheduled_date).toLocaleDateString()}
                                         </div>
                                       </div>
-                                      <Badge className={getStatusColor(control.status)}>
-                                        {control.status}
-                                      </Badge>
+                                      <div className="flex items-center gap-2">
+                                        <Badge className={getStatusColor(control.status)}>
+                                          {control.status}
+                                        </Badge>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="sm"
+                                          onClick={(e) => {
+                                            e.stopPropagation(); // Prevent event bubbling
+                                            setEditingControl({...control});
+                                            setShowEditControlForm(true);
+                                          }}
+                                        >
+                                          Edit
+                                        </Button>
+                                      </div>
                                     </div>
                                   ))}
                                 </div>

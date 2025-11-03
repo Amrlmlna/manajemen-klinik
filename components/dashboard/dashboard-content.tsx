@@ -4,6 +4,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { CurrencyDisplay } from "@/components/ui/currency-display"
 
 interface DashboardContentProps {
   profile: any
@@ -75,7 +76,9 @@ export function DashboardContent({ profile, stats, todayControls }: DashboardCon
               <CardTitle className="text-sm font-medium text-muted-foreground">Revenue (This Month)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${stats.thisMonthRevenue.toFixed(2)}</div>
+              <div className="text-2xl font-bold">
+                <CurrencyDisplay amount={stats.thisMonthRevenue} />
+              </div>
               <p className="text-xs text-muted-foreground mt-1">
                 <Link href="/reports" className="text-blue-600 hover:underline">
                   View reports

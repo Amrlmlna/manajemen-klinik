@@ -65,7 +65,7 @@ export function SchedulesList({ schedules }: SchedulesListProps) {
                   {schedule.is_active ? "Active" : "Inactive"}
                 </Badge>
               </td>
-              <td className="px-6 py-4 text-sm">${schedule.cost?.toFixed(2) || "-"}</td>
+              <td className="px-6 py-4 text-sm">Rp{schedule.cost ? schedule.cost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "-"}</td>
               <td className="px-6 py-4">
                 <Link href={`/schedules/${schedule.id}`}>
                   <Button variant="outline" size="sm">

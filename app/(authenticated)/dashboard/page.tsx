@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { SimpleDashboard } from "@/components/dashboard/simple-dashboard";
+import { CurrencyDisplay } from "@/components/ui/currency-display";
 
 export default async function SimpleDashboardPage() {
   const supabase = await createClient();
@@ -74,11 +75,7 @@ export default async function SimpleDashboardPage() {
           <div className="bg-primary text-primary-foreground rounded-lg p-4">
             <div className="text-sm">Total Income</div>
             <div className="text-2xl font-bold">
-              $
-              {totalIncome.toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
+              <CurrencyDisplay amount={totalIncome} />
             </div>
           </div>
         </div>

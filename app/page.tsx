@@ -228,7 +228,7 @@ export default async function HomePage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
-                  <div className="text-3xl font-bold">Rp 150.000</div>
+                  <div className="text-3xl font-bold">Rp150.000</div>
                   <p className="text-sm text-muted-foreground">per kunjungan</p>
                 </div>
                 <ul className="space-y-3 text-sm">
@@ -261,7 +261,7 @@ export default async function HomePage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
-                  <div className="text-3xl font-bold">Rp 350.000</div>
+                  <div className="text-3xl font-bold">Rp350.000</div>
                   <p className="text-sm text-muted-foreground">per kunjungan</p>
                 </div>
                 <ul className="space-y-3 text-sm">
@@ -296,7 +296,7 @@ export default async function HomePage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
-                  <div className="text-3xl font-bold">Rp 750.000</div>
+                  <div className="text-3xl font-bold">Rp750.000</div>
                   <p className="text-sm text-muted-foreground">per bulan</p>
                 </div>
                 <ul className="space-y-3 text-sm">

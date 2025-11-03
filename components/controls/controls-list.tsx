@@ -67,7 +67,7 @@ export function ControlsList({ controls }: ControlsListProps) {
               <td className="px-6 py-4">
                 <Badge className={statusColors[control.status] || "bg-gray-100 text-gray-800"}>{control.status}</Badge>
               </td>
-              <td className="px-6 py-4 text-sm">${control.cost?.toFixed(2) || "-"}</td>
+              <td className="px-6 py-4 text-sm">Rp{control.cost ? control.cost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "-"}</td>
               <td className="px-6 py-4">
                 <Link href={`/controls/${control.id}`}>
                   <Button variant="outline" size="sm">
