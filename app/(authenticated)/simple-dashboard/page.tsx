@@ -35,6 +35,20 @@ export default async function SimpleDashboardPage() {
     )
     .order("scheduled_date", { ascending: true });
 
+  // Get all control schedules with patient data
+  const { data: schedules } = await supabase
+    .from("control_schedules")
+    .select(
+      `
+      *,
+      patients:patient_id (
+        first_name,
+        last_name
+      )
+    `
+    )
+    .order("created_at", { ascending: false });
+
   // Calculate total income - using the 'cost' field from controls table
   const totalIncome =
     controls?.reduce((sum, control) => {
@@ -71,6 +85,7 @@ export default async function SimpleDashboardPage() {
 
         <SimpleDashboard
           controls={controls || []}
+          schedules={schedules || []}
           patients={patients || []}
           profile={profile}
         />

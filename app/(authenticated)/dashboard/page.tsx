@@ -1,26 +1,26 @@
-import { createClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
-import { DashboardContent } from "@/components/dashboard/dashboard-content"
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { SimpleDashboard } from "@/components/dashboard/simple-dashboard";
 
-export default async function DashboardPage() {
-  const supabase = await createClient()
+export default async function SimpleDashboardPage() {
+  const supabase = await createClient();
   const {
     data: { user },
     error,
-  } = await supabase.auth.getUser()
+  } = await supabase.auth.getUser();
 
   if (error || !user) {
-    redirect("/auth/login")
+    redirect("/auth/login");
   }
 
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+  // Get user profile to check permissions
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .single();
 
-  // Super admins can access both regular dashboard and admin panel
-  // No automatic redirection - let superadmins choose where to go
-  
-  // Get clinic statistics for all users (including superadmins)
-  const { data: patients } = await supabase.from("patients").select("*")
-
+  // Get all controls with patient data (not joining costs to ensure all controls show)
   const { data: controls } = await supabase
     .from("controls")
     .select(
@@ -28,20 +28,16 @@ export default async function DashboardPage() {
       *,
       patients:patient_id (
         first_name,
-        last_name
+        last_name,
+        phone
       )
-    `,
+    `
     )
-    .gte("scheduled_date", new Date().toISOString())
-    .order("scheduled_date", { ascending: true })
+    .order("scheduled_date", { ascending: true });
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const tomorrow = new Date(today)
-  tomorrow.setDate(tomorrow.getDate() + 1)
-
-  const { data: todayControls } = await supabase
-    .from("controls")
+  // Get all control schedules with patient data
+  const { data: schedules } = await supabase
+    .from("control_schedules")
     .select(
       `
       *,
@@ -49,33 +45,51 @@ export default async function DashboardPage() {
         first_name,
         last_name
       )
-    `,
+    `
     )
-    .gte("scheduled_date", today.toISOString())
-    .lt("scheduled_date", tomorrow.toISOString())
-    .order("scheduled_date", { ascending: true })
+    .order("created_at", { ascending: false });
 
-  const { data: costs } = await supabase.from("costs").select("*")
+  // Calculate total income - using the 'cost' field from controls table
+  const totalIncome =
+    controls?.reduce((sum, control) => {
+      return sum + (control.cost || 0);
+    }, 0) || 0;
 
-  const thisMonthRevenue =
-    costs
-      ?.filter((cost) => {
-        const costDate = new Date(cost.cost_date)
-        const now = new Date()
-        return costDate.getMonth() === now.getMonth() && costDate.getFullYear() === now.getFullYear()
-      })
-      .reduce((sum, cost) => (cost.cost_type === "control" ? sum + cost.amount : sum), 0) || 0
+  // Get all patients for the quick add form
+  const { data: patients } = await supabase
+    .from("patients")
+    .select("id, first_name, last_name");
 
   return (
-    <DashboardContent
-      profile={profile}
-      stats={{
-        totalPatients: patients?.length || 0,
-        totalControls: controls?.length || 0,
-        todayControls: todayControls?.length || 0,
-        thisMonthRevenue: thisMonthRevenue,
-      }}
-      todayControls={todayControls || []}
-    />
-  )
+    <div className="flex-1 flex flex-col overflow-auto">
+      <div className="p-4">
+        <div className="mb-6">
+          <h1 className="text-xl font-bold">Simple Clinic Dashboard</h1>
+          <p className="text-sm text-muted-foreground">
+            Member control and income tracking
+          </p>
+        </div>
+
+        <div className="mb-6">
+          <div className="bg-primary text-primary-foreground rounded-lg p-4">
+            <div className="text-sm">Total Income</div>
+            <div className="text-2xl font-bold">
+              $
+              {totalIncome.toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </div>
+          </div>
+        </div>
+
+        <SimpleDashboard
+          controls={controls || []}
+          schedules={schedules || []}
+          patients={patients || []}
+          profile={profile}
+        />
+      </div>
+    </div>
+  );
 }

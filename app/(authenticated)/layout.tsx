@@ -28,7 +28,9 @@ export default async function AuthenticatedLayout({
   return (
     <div className="flex h-screen bg-background">
       <Sidebar userId={user.id} clinicName={profile?.clinic_name} role={profile?.role || "admin"} />
-      <div className="flex-1 flex flex-col overflow-hidden">{children}</div>
+      <div className="flex-1 flex flex-col overflow-hidden pt-16 md:pt-0">
+        {children}
+      </div>
     </div>
   )
 }

@@ -27,6 +27,9 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
+// Import the calendar CSS styles
+import "react-big-calendar/lib/css/react-big-calendar.css";
+
 // Define the type for calendar events
 interface CalendarEvent {
   id: string;
@@ -40,8 +43,32 @@ interface CalendarEvent {
   notes: string;
 }
 
+interface Control {
+  id: string;
+  patient_id: string;
+  control_type: string;
+  scheduled_date: string;
+  status: string;
+  cost: number | null;
+  notes: string | null;
+  patients: any;
+}
+
+interface Schedule {
+  id: string;
+  patient_id: string;
+  control_type: string;
+  frequency: string;
+  start_date: string;
+  end_date: string | null;
+  is_active: boolean;
+  cost: number | null;
+  patients: any;
+}
+
 interface SimpleDashboardProps {
-  controls: any[];
+  controls: Control[];
+  schedules: Schedule[];
   patients: any[];
   profile: any;
 }
@@ -173,10 +200,10 @@ const CalendarWrapper = ({ calendarEvents }: { calendarEvents: CalendarEvent[] }
   return <CalendarComponent events={calendarEvents} />;
 };
 
-export function SimpleDashboard({ controls, patients, profile }: SimpleDashboardProps) {
+export function SimpleDashboard({ controls, schedules, patients, profile }: SimpleDashboardProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table'); // New state for view mode
+  const [viewMode, setViewMode] = useState<'table' | 'calendar' | 'patients'>('patients'); // New state for view mode (default to patients view)
   const [newControl, setNewControl] = useState({
     patient_id: "",
     control_type: "Checkup",
@@ -184,21 +211,62 @@ export function SimpleDashboard({ controls, patients, profile }: SimpleDashboard
     cost: 0,
     notes: ""
   });
+  // New patient data for control form
+  const [newPatientForControl, setNewPatientForControl] = useState({
+    first_name: "",
+    last_name: "",
+    email: "",
+    phone: "",
+  });
+  const [createNewPatientForControl, setCreateNewPatientForControl] = useState(false);
+  
+  const [newSchedule, setNewSchedule] = useState({
+    patient_id: "",
+    control_type: "Checkup",
+    frequency: "weekly",
+    start_date: new Date().toISOString().split('T')[0],
+    end_date: "",
+    cost: 0,
+    notes: ""
+  });
+  // New patient data for schedule form
+  const [newPatientForSchedule, setNewPatientForSchedule] = useState({
+    first_name: "",
+    last_name: "",
+    email: "",
+    phone: "",
+  });
+  const [createNewPatientForSchedule, setCreateNewPatientForSchedule] = useState(false);
+  const [showAddScheduleForm, setShowAddScheduleForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Transform controls data to calendar events format
-  const calendarEvents: CalendarEvent[] = controls?.map(control => ({
-    id: control.id,
-    title: `${control.patients?.first_name} ${control.patients?.last_name} - ${control.control_type}`,
-    start: new Date(control.scheduled_date),
-    end: new Date(new Date(control.scheduled_date).getTime() + 60 * 60 * 1000), // 1 hour duration
-    resourceId: control.patient_id,
-    status: control.status,
-    control_type: control.control_type,
-    cost: control.cost || 0,
-    notes: control.notes || '',
-  })) || [];
+  const calendarEvents: CalendarEvent[] = [
+    ...controls?.map(control => ({
+      id: control.id,
+      title: `${control.patients?.first_name} ${control.patients?.last_name} - ${control.control_type}`,
+      start: new Date(control.scheduled_date),
+      end: new Date(new Date(control.scheduled_date).getTime() + 60 * 60 * 1000), // 1 hour duration
+      resourceId: control.patient_id,
+      status: control.status,
+      control_type: control.control_type,
+      cost: control.cost || 0,
+      notes: control.notes || '',
+    })) || [],
+    // Add recurring schedule events (this is a simplified representation)
+    ...schedules?.filter(schedule => schedule.is_active).map(schedule => ({
+      id: `schedule-${schedule.id}`,
+      title: `${schedule.patients?.first_name} ${schedule.patients?.last_name} - ${schedule.control_type} (Schedule)`,
+      start: new Date(schedule.start_date),
+      end: new Date(new Date(schedule.start_date).getTime() + 60 * 60 * 1000), // 1 hour duration
+      resourceId: schedule.patient_id,
+      status: 'scheduled',
+      control_type: schedule.control_type,
+      cost: schedule.cost || 0,
+      notes: `Recurring ${schedule.frequency} schedule`,
+    })) || []
+  ];
 
   // Filter controls based on search term
   const filteredControls = controls.filter(control => {
@@ -208,6 +276,26 @@ export function SimpleDashboard({ controls, patients, profile }: SimpleDashboard
            controlType.includes(searchTerm.toLowerCase());
   });
 
+  // Function to create a new patient
+  const createNewPatient = async (patientData: { first_name: string; last_name: string; email?: string; phone?: string }) => {
+    const supabase = createClient();
+    
+    const { data, error } = await supabase
+      .from('patients')
+      .insert([{
+        first_name: patientData.first_name,
+        last_name: patientData.last_name,
+        email: patientData.email || null,
+        phone: patientData.phone || null,
+      }])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return data;
+  };
+
   const handleAddControl = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -215,19 +303,36 @@ export function SimpleDashboard({ controls, patients, profile }: SimpleDashboard
     
     try {
       const supabase = createClient();
+      let patientId = newControl.patient_id;
       
-      // Validate patient ID is selected
-      if (!newControl.patient_id) {
-        setError("Please select a patient.");
-        setLoading(false);
-        return;
+      // Check if we need to create a new patient
+      if (createNewPatientForControl) {
+        if (!newPatientForControl.first_name || !newPatientForControl.last_name) {
+          setError("Please enter both first name and last name for the new patient.");
+          setLoading(false);
+          return;
+        }
+        
+        // Create new patient
+        const newPatient = await createNewPatient(newPatientForControl);
+        patientId = newPatient.id;
+        
+        // Update the patients list for the form
+        // In a real app, we'd update the state to include the new patient
+      } else {
+        // Validate patient ID is selected
+        if (!patientId) {
+          setError("Please select a patient.");
+          setLoading(false);
+          return;
+        }
       }
       
       // Create the control
       const { data: controlData, error: controlError } = await supabase
         .from('controls')
         .insert([{
-          patient_id: newControl.patient_id,
+          patient_id: patientId,
           control_type: newControl.control_type,
           scheduled_date: newControl.scheduled_date,
           cost: newControl.cost,
@@ -262,6 +367,13 @@ export function SimpleDashboard({ controls, patients, profile }: SimpleDashboard
         cost: 0,
         notes: ""
       });
+      setNewPatientForControl({
+        first_name: "",
+        last_name: "",
+        email: "",
+        phone: "",
+      });
+      setCreateNewPatientForControl(false);
       setShowAddForm(false);
       
       // In a real app, you would refresh the data or add to local state
@@ -270,6 +382,82 @@ export function SimpleDashboard({ controls, patients, profile }: SimpleDashboard
     } catch (err: any) {
       console.error("Error adding control:", err);
       setError(err.message || "Failed to add control. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const supabase = createClient();
+      let patientId = newSchedule.patient_id;
+      
+      // Check if we need to create a new patient
+      if (createNewPatientForSchedule) {
+        if (!newPatientForSchedule.first_name || !newPatientForSchedule.last_name) {
+          setError("Please enter both first name and last name for the new patient.");
+          setLoading(false);
+          return;
+        }
+        
+        // Create new patient
+        const newPatient = await createNewPatient(newPatientForSchedule);
+        patientId = newPatient.id;
+      } else {
+        // Validate patient ID is selected
+        if (!patientId) {
+          setError("Please select a patient.");
+          setLoading(false);
+          return;
+        }
+      }
+      
+      // Create the schedule
+      const { data: scheduleData, error: scheduleError } = await supabase
+        .from('control_schedules')
+        .insert([{
+          patient_id: patientId,
+          control_type: newSchedule.control_type,
+          frequency: newSchedule.frequency,
+          start_date: newSchedule.start_date,
+          end_date: newSchedule.end_date || null,
+          cost: newSchedule.cost,
+          is_active: true
+        }])
+        .select()
+        .single();
+      
+      if (scheduleError) throw scheduleError;
+      
+      // Reset form
+      setNewSchedule({
+        patient_id: "",
+        control_type: "Checkup",
+        frequency: "weekly",
+        start_date: new Date().toISOString().split('T')[0],
+        end_date: "",
+        cost: 0,
+        notes: ""
+      });
+      setNewPatientForSchedule({
+        first_name: "",
+        last_name: "",
+        email: "",
+        phone: "",
+      });
+      setCreateNewPatientForSchedule(false);
+      setShowAddScheduleForm(false);
+      
+      // In a real app, you would refresh the data or add to local state
+      // For now, we'll just reload the page
+      window.location.reload();
+    } catch (err: any) {
+      console.error("Error adding schedule:", err);
+      setError(err.message || "Failed to add schedule. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -287,6 +475,38 @@ export function SimpleDashboard({ controls, patients, profile }: SimpleDashboard
         return "bg-blue-100 text-blue-800 border-blue-200";
     }
   };
+
+  // Group controls and schedules by patient
+  const groupedByPatient: Record<string, { patient: any; controls: Control[]; schedules: Schedule[] }> = {};
+  
+  // Initialize all patients
+  patients.forEach(patient => {
+    groupedByPatient[patient.id] = {
+      patient,
+      controls: [],
+      schedules: []
+    };
+  });
+  
+  // Add controls to their respective patients
+  controls.forEach(control => {
+    if (groupedByPatient[control.patient_id]) {
+      groupedByPatient[control.patient_id].controls.push(control);
+    }
+  });
+  
+  // Add schedules to their respective patients
+  schedules.forEach(schedule => {
+    if (groupedByPatient[schedule.patient_id]) {
+      groupedByPatient[schedule.patient_id].schedules.push(schedule);
+    }
+  });
+  
+  // Filter patients based on search term
+  const filteredPatientGroups = Object.values(groupedByPatient).filter(group => {
+    const patientName = `${group.patient.first_name} ${group.patient.last_name}`.toLowerCase();
+    return patientName.includes(searchTerm.toLowerCase());
+  });
 
   return (
     <div className="space-y-6">
@@ -306,7 +526,6 @@ export function SimpleDashboard({ controls, patients, profile }: SimpleDashboard
             variant={viewMode === 'table' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setViewMode('table')}
-            className="rounded-r-none"
           >
             <List className="h-4 w-4" />
           </Button>
@@ -314,14 +533,65 @@ export function SimpleDashboard({ controls, patients, profile }: SimpleDashboard
             variant={viewMode === 'calendar' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setViewMode('calendar')}
-            className="rounded-l-none"
           >
             <Calendar className="h-4 w-4" />
           </Button>
-          <Button type="button" onClick={() => setShowAddForm(!showAddForm)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add
+          <Button 
+            variant={viewMode === 'patients' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('patients')}
+          >
+            <User className="h-4 w-4" />
+            Members
           </Button>
+          <div className="relative group">
+            <Button type="button">
+              <Plus className="h-4 w-4 mr-2" />
+              Add
+            </Button>
+            <div className="absolute right-0 mt-1 w-48 bg-white border rounded-md shadow-lg z-10 hidden group-hover:block">
+              <button
+                className="block w-full text-left px-4 py-2 hover:bg-gray-100"
+                onClick={() => {
+                  setShowAddForm(true);
+                  setShowAddScheduleForm(false);
+                  setCreateNewPatientForControl(false); // Default to existing patient
+                }}
+              >
+                Add Control (Existing Patient)
+              </button>
+              <button
+                className="block w-full text-left px-4 py-2 hover:bg-gray-100"
+                onClick={() => {
+                  setShowAddForm(true);
+                  setShowAddScheduleForm(false);
+                  setCreateNewPatientForControl(true); // Default to new patient
+                }}
+              >
+                Add Control (New Patient)
+              </button>
+              <button
+                className="block w-full text-left px-4 py-2 hover:bg-gray-100"
+                onClick={() => {
+                  setShowAddScheduleForm(true);
+                  setShowAddForm(false);
+                  setCreateNewPatientForSchedule(false); // Default to existing patient
+                }}
+              >
+                Add Schedule (Existing Patient)
+              </button>
+              <button
+                className="block w-full text-left px-4 py-2 hover:bg-gray-100"
+                onClick={() => {
+                  setShowAddScheduleForm(true);
+                  setShowAddForm(false);
+                  setCreateNewPatientForSchedule(true); // Default to new patient
+                }}
+              >
+                Add Schedule (New Patient)
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Add New Control Form */}
@@ -334,7 +604,34 @@ export function SimpleDashboard({ controls, patients, profile }: SimpleDashboard
               {error && <div className="text-red-500 text-sm mb-4">{error}</div>}
               
               <form onSubmit={handleAddControl} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Patient selection or creation toggle */}
+                <div className="flex border rounded-md">
+                  <button
+                    type="button"
+                    className={`flex-1 py-2 text-sm rounded-l-md ${
+                      !createNewPatientForControl 
+                        ? "bg-primary text-primary-foreground" 
+                        : "bg-muted hover:bg-muted/80"
+                    }`}
+                    onClick={() => setCreateNewPatientForControl(false)}
+                  >
+                    Existing Patient
+                  </button>
+                  <button
+                    type="button"
+                    className={`flex-1 py-2 text-sm rounded-r-md ${
+                      createNewPatientForControl 
+                        ? "bg-primary text-primary-foreground" 
+                        : "bg-muted hover:bg-muted/80"
+                    }`}
+                    onClick={() => setCreateNewPatientForControl(true)}
+                  >
+                    New Patient
+                  </button>
+                </div>
+                
+                {/* Show patient selection when not creating new patient */}
+                {!createNewPatientForControl ? (
                   <div className="space-y-2">
                     <Label htmlFor="patient">Patient</Label>
                     <Select 
@@ -353,7 +650,48 @@ export function SimpleDashboard({ controls, patients, profile }: SimpleDashboard
                       </SelectContent>
                     </Select>
                   </div>
-                  
+                ) : (
+                  // Show new patient form when creating new patient
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="first_name">First Name *</Label>
+                      <Input
+                        id="first_name"
+                        value={newPatientForControl.first_name}
+                        onChange={(e) => setNewPatientForControl({...newPatientForControl, first_name: e.target.value})}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="last_name">Last Name *</Label>
+                      <Input
+                        id="last_name"
+                        value={newPatientForControl.last_name}
+                        onChange={(e) => setNewPatientForControl({...newPatientForControl, last_name: e.target.value})}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={newPatientForControl.email}
+                        onChange={(e) => setNewPatientForControl({...newPatientForControl, email: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Phone</Label>
+                      <Input
+                        id="phone"
+                        value={newPatientForControl.phone}
+                        onChange={(e) => setNewPatientForControl({...newPatientForControl, phone: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="control_type">Control Type</Label>
                     <Select 
@@ -414,7 +752,201 @@ export function SimpleDashboard({ controls, patients, profile }: SimpleDashboard
                   <Button 
                     type="button"
                     variant="outline" 
-                    onClick={() => setShowAddForm(false)}
+                    onClick={() => {
+                      setShowAddForm(false);
+                      setCreateNewPatientForControl(false);
+                    }}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Add New Schedule Form */}
+        {showAddScheduleForm && (
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle>Add New Schedule</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {error && <div className="text-red-500 text-sm mb-4">{error}</div>}
+              
+              <form onSubmit={handleAddSchedule} className="space-y-4">
+                {/* Patient selection or creation toggle */}
+                <div className="flex border rounded-md">
+                  <button
+                    type="button"
+                    className={`flex-1 py-2 text-sm rounded-l-md ${
+                      !createNewPatientForSchedule 
+                        ? "bg-primary text-primary-foreground" 
+                        : "bg-muted hover:bg-muted/80"
+                    }`}
+                    onClick={() => setCreateNewPatientForSchedule(false)}
+                  >
+                    Existing Patient
+                  </button>
+                  <button
+                    type="button"
+                    className={`flex-1 py-2 text-sm rounded-r-md ${
+                      createNewPatientForSchedule 
+                        ? "bg-primary text-primary-foreground" 
+                        : "bg-muted hover:bg-muted/80"
+                    }`}
+                    onClick={() => setCreateNewPatientForSchedule(true)}
+                  >
+                    New Patient
+                  </button>
+                </div>
+                
+                {/* Show patient selection when not creating new patient */}
+                {!createNewPatientForSchedule ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="schedule-patient">Patient</Label>
+                    <Select 
+                      value={newSchedule.patient_id} 
+                      onValueChange={(value) => setNewSchedule({...newSchedule, patient_id: value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select patient" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {patients.map(patient => (
+                          <SelectItem key={patient.id} value={patient.id}>
+                            {patient.first_name} {patient.last_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  // Show new patient form when creating new patient
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="first_name">First Name *</Label>
+                      <Input
+                        id="first_name"
+                        value={newPatientForSchedule.first_name}
+                        onChange={(e) => setNewPatientForSchedule({...newPatientForSchedule, first_name: e.target.value})}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="last_name">Last Name *</Label>
+                      <Input
+                        id="last_name"
+                        value={newPatientForSchedule.last_name}
+                        onChange={(e) => setNewPatientForSchedule({...newPatientForSchedule, last_name: e.target.value})}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={newPatientForSchedule.email}
+                        onChange={(e) => setNewPatientForSchedule({...newPatientForSchedule, email: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Phone</Label>
+                      <Input
+                        id="phone"
+                        value={newPatientForSchedule.phone}
+                        onChange={(e) => setNewPatientForSchedule({...newPatientForSchedule, phone: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="control_type">Control Type</Label>
+                    <Select 
+                      value={newSchedule.control_type} 
+                      onValueChange={(value) => setNewSchedule({...newSchedule, control_type: value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Checkup">Checkup</SelectItem>
+                        <SelectItem value="Follow-up">Follow-up</SelectItem>
+                        <SelectItem value="Treatment">Treatment</SelectItem>
+                        <SelectItem value="Review">Review</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="frequency">Frequency</Label>
+                    <Select 
+                      value={newSchedule.frequency} 
+                      onValueChange={(value) => setNewSchedule({...newSchedule, frequency: value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                        <SelectItem value="quarterly">Quarterly</SelectItem>
+                        <SelectItem value="yearly">Yearly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="cost">Cost ($)</Label>
+                    <Input
+                      type="number"
+                      placeholder="0.00"
+                      value={newSchedule.cost}
+                      onChange={(e) => setNewSchedule({...newSchedule, cost: parseFloat(e.target.value) || 0})}
+                      min="0"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="start_date">Start Date</Label>
+                    <Input
+                      type="date"
+                      value={newSchedule.start_date}
+                      onChange={(e) => setNewSchedule({...newSchedule, start_date: e.target.value})}
+                      required
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="end_date">End Date (optional)</Label>
+                    <Input
+                      type="date"
+                      value={newSchedule.end_date}
+                      onChange={(e) => setNewSchedule({...newSchedule, end_date: e.target.value})}
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex gap-2 pt-2">
+                  <Button 
+                    type="submit"
+                    disabled={loading}
+                    className="flex-1"
+                  >
+                    {loading ? "Adding..." : "Add Schedule"}
+                  </Button>
+                  <Button 
+                    type="button"
+                    variant="outline" 
+                    onClick={() => {
+                      setShowAddScheduleForm(false);
+                      setCreateNewPatientForSchedule(false);
+                    }}
                     className="flex-1"
                   >
                     Cancel
@@ -426,7 +958,7 @@ export function SimpleDashboard({ controls, patients, profile }: SimpleDashboard
         )}
       </div>
 
-      {/* Toggleable View - Table or Calendar */}
+      {/* Toggleable View - Table, Calendar, or Patients */}
       {viewMode === 'table' ? (
         <Card>
           <CardHeader>
@@ -504,6 +1036,178 @@ export function SimpleDashboard({ controls, patients, profile }: SimpleDashboard
             )}
           </CardContent>
         </Card>
+      ) : viewMode === 'patients' ? (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Members
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {filteredPatientGroups.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No members found. Add your first patient to get started.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredPatientGroups.map((group) => {
+                    // Get upcoming controls for this patient (controls in the future)
+                    const upcomingControls = group.controls.filter(control => 
+                      new Date(control.scheduled_date) >= new Date()
+                    ).sort((a, b) => new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime());
+                    
+                    // Get recent past controls (controls in the past 30 days)
+                    const pastDate = new Date();
+                    pastDate.setDate(pastDate.getDate() - 30);
+                    const recentControls = group.controls.filter(control => 
+                      new Date(control.scheduled_date) >= pastDate && 
+                      new Date(control.scheduled_date) < new Date()
+                    ).sort((a, b) => new Date(b.scheduled_date).getTime() - new Date(a.scheduled_date).getTime());
+                    
+                    return (
+                      <Card key={group.patient.id} className="overflow-hidden">
+                        <CardHeader className="bg-muted/30">
+                          <CardTitle className="text-lg">
+                            {group.patient.first_name} {group.patient.last_name}
+                          </CardTitle>
+                          {group.patient.phone && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Phone className="h-4 w-4" />
+                              {group.patient.phone}
+                            </div>
+                          )}
+                          {group.patient.email && (
+                            <div className="text-sm text-muted-foreground">
+                              {group.patient.email}
+                            </div>
+                          )}
+                        </CardHeader>
+                        <CardContent className="p-4">
+                          <div className="space-y-4">
+                            {/* Upcoming Controls */}
+                            <div>
+                              <h4 className="font-medium text-sm mb-2">Upcoming Controls</h4>
+                              {upcomingControls.length > 0 ? (
+                                <div className="space-y-2">
+                                  {upcomingControls.slice(0, 3).map(control => (
+                                    <div key={control.id} className="flex justify-between items-center text-sm p-2 bg-muted/20 rounded">
+                                      <div>
+                                        <div className="font-medium">{control.control_type}</div>
+                                        <div className="text-xs text-muted-foreground">
+                                          {new Date(control.scheduled_date).toLocaleDateString()}
+                                        </div>
+                                      </div>
+                                      <Badge className={getStatusColor(control.status)}>
+                                        {control.status}
+                                      </Badge>
+                                    </div>
+                                  ))}
+                                  {upcomingControls.length > 3 && (
+                                    <div className="text-xs text-muted-foreground text-center pt-1">
+                                      +{upcomingControls.length - 3} more...
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="text-sm text-muted-foreground py-2 text-center">
+                                  No upcoming controls
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Recurring Schedules */}
+                            <div>
+                              <h4 className="font-medium text-sm mb-2">Recurring Schedules</h4>
+                              {group.schedules.length > 0 ? (
+                                <div className="space-y-2">
+                                  {group.schedules.map(schedule => (
+                                    <div key={schedule.id} className="flex justify-between items-center text-sm p-2 bg-muted/20 rounded">
+                                      <div>
+                                        <div className="font-medium">{schedule.control_type}</div>
+                                        <div className="text-xs text-muted-foreground capitalize">
+                                          {schedule.frequency}
+                                        </div>
+                                      </div>
+                                      <Badge className={schedule.is_active ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>
+                                        {schedule.is_active ? "Active" : "Inactive"}
+                                      </Badge>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-sm text-muted-foreground py-2 text-center">
+                                  No recurring schedules
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Recent Controls */}
+                            <div>
+                              <h4 className="font-medium text-sm mb-2">Recent Controls</h4>
+                              {recentControls.length > 0 ? (
+                                <div className="space-y-2">
+                                  {recentControls.slice(0, 2).map(control => (
+                                    <div key={control.id} className="flex justify-between items-center text-sm p-2 bg-muted/20 rounded">
+                                      <div>
+                                        <div className="font-medium">{control.control_type}</div>
+                                        <div className="text-xs text-muted-foreground">
+                                          {new Date(control.scheduled_date).toLocaleDateString()}
+                                        </div>
+                                      </div>
+                                      <Badge className={getStatusColor(control.status)}>
+                                        {control.status}
+                                      </Badge>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-sm text-muted-foreground py-2 text-center">
+                                  No recent controls
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Quick Actions */}
+                            <div className="flex gap-2 pt-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="flex-1"
+                                onClick={() => {
+                                  setNewControl({...newControl, patient_id: group.patient.id});
+                                  setCreateNewPatientForControl(false); // Ensure we're not in new patient mode
+                                  setShowAddForm(true);
+                                }}
+                              >
+                                <Calendar className="h-4 w-4 mr-1" />
+                                Add Control
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="flex-1"
+                                onClick={() => {
+                                  setNewSchedule({...newSchedule, patient_id: group.patient.id});
+                                  setCreateNewPatientForSchedule(false); // Ensure we're not in new patient mode
+                                  setShowAddScheduleForm(true);
+                                }}
+                              >
+                                <List className="h-4 w-4 mr-1" />
+                                Add Schedule
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       ) : (
         <Card>
           <CardHeader>
