@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { AdminDashboard } from "@/components/admin/admin-dashboard"
+import { SuperAdminDashboard } from "@/components/admin/superadmin-dashboard"
 
 export default async function AdminPage() {
   const supabase = await createClient()
@@ -22,13 +22,26 @@ export default async function AdminPage() {
     redirect("/dashboard")
   }
 
-  // Get clinic statistics (for personal clinic)
-  const { data: clinicUsers } = await supabase.from("profiles").select("*")
+  // Get system-wide statistics for super admin
+  // Get all clinics data
+  const { data: allClinics } = await supabase
+    .from("profiles")
+    .select("id, clinic_name, email, created_at, role")
+    .order("created_at", { ascending: false })
 
+  // Get all users data
+  const { data: allUsers } = await supabase
+    .from("profiles")
+    .select("id, email, clinic_name, role, created_at")
+    .order("created_at", { ascending: false })
+
+  // Get all patients data
   const { data: allPatients } = await supabase.from("patients").select("*")
 
+  // Get all controls data
   const { data: allControls } = await supabase.from("controls").select("*")
 
+  // Get all costs data for revenue calculation
   const { data: allCosts } = await supabase.from("costs").select("*")
 
   const totalRevenue =
@@ -41,19 +54,21 @@ export default async function AdminPage() {
     <div className="flex-1 flex flex-col overflow-auto">
       <div className="p-6">
         <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Clinic Administration</h1>
+          <h1 className="text-2xl font-bold">System Administration</h1>
           <Link href="/dashboard">
             <Button variant="outline">Back to Dashboard</Button>
           </Link>
         </div>
-        <AdminDashboard
+        <SuperAdminDashboard
           stats={{
-            totalClinics: 1, // Personal clinic only
+            totalClinics: allClinics?.length || 0,
+            totalUsers: allUsers?.length || 0,
             totalPatients: allPatients?.length || 0,
             totalControls: allControls?.length || 0,
             totalRevenue: totalRevenue,
           }}
-          clinics={clinicUsers || []}
+          clinics={allClinics || []}
+          users={allUsers || []}
         />
       </div>
     </div>

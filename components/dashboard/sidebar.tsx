@@ -11,6 +11,7 @@ import {
   Settings,
   Menu,
   X,
+  Shield,
 } from "lucide-react";
 import { NotificationBell } from "./notification-bell";
 import Link from "next/link";
@@ -18,9 +19,10 @@ import Link from "next/link";
 interface SidebarProps {
   userId: string;
   clinicName?: string;
+  role: string; // Add role prop
 }
 
-export function Sidebar({ userId, clinicName }: SidebarProps) {
+export function Sidebar({ userId, clinicName, role }: SidebarProps) {
   const [isMobile, setIsMobile] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const pathname = usePathname();
@@ -39,14 +41,29 @@ export function Sidebar({ userId, clinicName }: SidebarProps) {
     };
   }, []);
 
-  const links = [
-    { href: "/dashboard", label: "Dashboard", icon: Home },
-    { href: "/patients", label: "Patients", icon: Users },
-    { href: "/controls", label: "Controls", icon: Calendar },
-    { href: "/schedules", label: "Schedules", icon: Calendar },
-    { href: "/reports", label: "Reports", icon: BarChart },
-    { href: "/settings", label: "Settings", icon: Settings },
-  ];
+  // Define menu links based on user role
+  const getMenuLinks = () => {
+    const baseLinks = [
+      { href: "/dashboard", label: "Dashboard", icon: Home },
+      { href: "/patients", label: "Patients", icon: Users },
+      { href: "/controls", label: "Controls", icon: Calendar },
+      { href: "/schedules", label: "Schedules", icon: Calendar },
+      { href: "/reports", label: "Reports", icon: BarChart },
+      { href: "/settings", label: "Settings", icon: Settings },
+    ];
+
+    // Only add admin link for super_admins
+    if (role === "super_admin") {
+      return [
+        ...baseLinks,
+        { href: "/admin", label: "Admin Panel", icon: Shield },
+      ];
+    }
+
+    return baseLinks;
+  };
+
+  const links = getMenuLinks();
 
   // Mobile sidebar
   if (isMobile) {

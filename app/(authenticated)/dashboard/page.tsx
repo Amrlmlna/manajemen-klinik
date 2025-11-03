@@ -15,7 +15,12 @@ export default async function DashboardPage() {
 
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
-  // Get all statistics (for personal clinic)
+  // Super admins should go to the dedicated admin section
+  if (profile?.role === "super_admin") {
+    redirect("/admin")
+  }
+
+  // Get clinic statistics for admin and regular users
   const { data: patients } = await supabase.from("patients").select("*")
 
   const { data: controls } = await supabase

@@ -18,16 +18,16 @@ export default async function AuthenticatedLayout({
     redirect("/auth/login")
   }
 
-  // Get user profile to pass clinic name to sidebar
+  // Get user profile to pass clinic name and role to sidebar
   const { data: profile } = await supabase
     .from("profiles")
-    .select("clinic_name")
+    .select("clinic_name, role")
     .eq("id", user.id)
     .single()
 
   return (
     <div className="flex h-screen bg-background">
-      <Sidebar userId={user.id} clinicName={profile?.clinic_name} />
+      <Sidebar userId={user.id} clinicName={profile?.clinic_name} role={profile?.role || "admin"} />
       <div className="flex-1 flex flex-col overflow-hidden">{children}</div>
     </div>
   )

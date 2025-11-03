@@ -2,14 +2,9 @@
 
 import type React from "react"
 
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useState } from "react"
 
 export default function SignUpPage() {
   return (
@@ -25,6 +20,9 @@ export default function SignUpPage() {
               <p className="text-sm text-muted-foreground">
                 This clinic management system is for internal use only. 
                 New accounts must be created by an administrator.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                If you need access, please contact your system administrator.
               </p>
               <Link href="/auth/login">
                 <Button className="w-full">Back to Login</Button>
